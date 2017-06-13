@@ -1,0 +1,64 @@
+FORM xls2itab.
+  DATA: temp(2).
+*create X dynamic fields
+  DO 10 TIMES.
+    CLEAR wa_it_fldcat.
+    temp = sy-index.
+    CONCATENATE 'field' temp INTO wa_it_fldcat-fieldname. "name of columns
+    wa_it_fldcat-datatype = 'C'.
+    wa_it_fldcat-inttype = 'C'.
+    wa_it_fldcat-intlen = 30. "lenght of columns
+    APPEND wa_it_fldcat TO it_fldcat .
+  ENDDO.
+
+* Create dynamic internal table and assign to FS
+  CALL METHOD cl_alv_table_create=>create_dynamic_table
+    EXPORTING
+      it_fieldcatalog = it_fldcat
+    IMPORTING
+      ep_table        = new_table.
+
+  ASSIGN new_table->* TO <dyn_table>.
+
+* Create dynamic work area and assign to FS
+  CREATE DATA new_line LIKE LINE OF <dyn_table>.
+  ASSIGN new_line->* TO <dyn_wa>.
+
+
+  CALL FUNCTION 'ALSM_EXCEL_TO_INTERNAL_TABLE'
+    EXPORTING
+      filename                      = p_upload
+      i_begin_col                   = '1'
+      i_begin_row                   = '1'
+      i_end_col                     = '10' "number of columns
+      i_end_row                     = '65536'
+    TABLES
+      intern                        = xcel
+*   EXCEPTIONS
+*     INCONSISTENT_PARAMETERS       = 1
+*     UPLOAD_OLE                    = 2
+*     OTHERS                        = 3
+            .
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+
+* Reformt to dynamic internal table
+  LOOP AT xcel.
+    ASSIGN COMPONENT xcel-col OF STRUCTURE <dyn_wa> TO <dyn_field>.
+    IF sy-subrc = 0.
+      <dyn_field> = xcel-value.
+    ENDIF.
+
+    AT END OF row.
+      APPEND <dyn_wa> TO <dyn_table>.
+      CLEAR <dyn_wa>.
+    ENDAT.
+  ENDLOOP.
+
+
+
+
+
+ENDFORM.
